@@ -12,46 +12,90 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'min:6', 'max:15'],
-        ]);
-
-        $user = \App\Models\User::where('email', $validated['email'])
-            ->first();
-
-        if(!Auth::attempt($validated)) {
-            return response()->json(['Incorrect username or password!'], 403);
-        }
-
-        if (!$user->is_active) {
-            throw ValidationException::withMessages([
-                'email' => ['Your account has been deactivated.'],
+        try {
+            $validated = $request->validate([
+                'email' => ['required', 'email'],
+                'password' => ['required', 'min:6', 'max:15'],
             ]);
+
+            $user = \App\Models\User::where('email', $validated['email'])->first();
+
+            if (!$user) {
+                throw ValidationException::withMessages([
+                    'email' => ['The provided credentials are incorrect.'],
+                ]);
+            }
+
+            if (!$user->is_active) {
+                throw ValidationException::withMessages([
+                    'email' => ['Your account has been deactivated.'],
+                ]);
+            }
+
+            if (!Auth::attempt($validated)) {
+                throw ValidationException::withMessages([
+                    'email' => ['The provided credentials are incorrect.'],
+                ]);
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Login successful',
+                'data' => [
+                    'user' => $user->load('role'),
+                    'token' => $token,
+                ]
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred during login',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'user' => $user->load('role'),
-            'token' => $token,
-        ], 200);
     }
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        try {
+            $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'message' => 'Logged out successfully'
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Logged out successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred during logout',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function user(Request $request)
     {
-        return response()->json([
-            'user' => $request->user()->load('role')
-        ]);
+        try {
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'user' => $request->user()->load('role')
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while fetching user data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
