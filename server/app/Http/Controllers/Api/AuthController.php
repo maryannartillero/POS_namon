@@ -20,7 +20,13 @@ class AuthController extends Controller
 
             $user = \App\Models\User::where('email', $validated['email'])->first();
 
-            if (!$user) {
+            // if (!$user) {
+            //     throw ValidationException::withMessages([
+            //         'email' => ['The provided credentials are incorrect.'],
+            //     ]);
+            // }
+
+            if (!Auth::attempt($validated)) {
                 throw ValidationException::withMessages([
                     'email' => ['The provided credentials are incorrect.'],
                 ]);
@@ -32,11 +38,6 @@ class AuthController extends Controller
                 ]);
             }
 
-            if (!Auth::attempt($validated)) {
-                throw ValidationException::withMessages([
-                    'email' => ['The provided credentials are incorrect.'],
-                ]);
-            }
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
