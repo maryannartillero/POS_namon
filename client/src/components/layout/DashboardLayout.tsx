@@ -11,7 +11,9 @@ import {
   Menu, 
   X,
   Home,
-  Tag
+  Tag,
+  Shield,
+  Receipt
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -27,6 +29,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const menuItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/users', icon: Users, label: 'User Management' },
+    { path: '/roles', icon: Shield, label: 'Roles' },
     { path: '/categories', icon: Tag, label: 'Categories' },
     { path: '/products', icon: Package, label: 'Products' },
     { path: '/transactions', icon: ShoppingCart, label: 'Transactions' },

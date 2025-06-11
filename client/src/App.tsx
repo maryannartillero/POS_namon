@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardLayout from './components/layout/DashboardLayout'
 import Dashboard from './pages/Dashboard'
 import UsersPage from './pages/UsersPage'
+import RolesPage from './pages/RolesPage'
 import ProductsPage from './pages/ProductsPage'
 import CategoriesPage from './pages/CategoriesPage'
 import TransactionsPage from './pages/TransactionsPage'
@@ -36,8 +37,9 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/users" element={<UsersPage />} />
-        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/roles" element={<RolesPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/products" element={<ProductsPage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
