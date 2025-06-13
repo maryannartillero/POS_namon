@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { Plus, Edit, Trash2, Search, Package, AlertTriangle, Barcode } from 'lucide-react'
+import { Plus, Edit, Trash2, Search, Package, AlertTriangle, Barcode, Scan } from 'lucide-react'
 import { productsAPI, categoriesAPI } from '../services/api'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
+import BarcodeGenerator from '../components/barcode/BarcodeGenerator'
+import BarcodeScanner from '../components/barcode/BarcodeScanner'
 import toast from 'react-hot-toast'
 
 interface Product {
@@ -32,8 +34,11 @@ interface Category {
 const ProductsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false)
   const [showStockModal, setShowStockModal] = useState(false)
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false)
+  const [showScannerModal, setShowScannerModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [stockProduct, setStockProduct] = useState<Product | null>(null)
+  const [barcodeProduct, setBarcodeProduct] = useState<Product | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [formData, setFormData] = useState({
@@ -171,6 +176,11 @@ const ProductsPage: React.FC = () => {
     setShowStockModal(true)
   }
 
+  const handleOpenBarcodeModal = (product: Product) => {
+    setBarcodeProduct(product)
+    setShowBarcodeModal(true)
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -229,6 +239,17 @@ const ProductsPage: React.FC = () => {
     setFormData(prev => ({ ...prev, barcode }))
   }
 
+  const handleBarcodeScanned = (scannedCode: string) => {
+    const product = products.find(p => p.barcode === scannedCode || p.sku === scannedCode)
+    if (product) {
+      toast.success(`Product found: ${product.name}`)
+      // You can add logic here to select or highlight the found product
+    } else {
+      toast.error('Product not found')
+    }
+    setShowScannerModal(false)
+  }
+
   const isLoading = createProductMutation.isLoading || updateProductMutation.isLoading
 
   return (
@@ -239,13 +260,22 @@ const ProductsPage: React.FC = () => {
           <h1>Products Management</h1>
           <p className="text-muted">Manage beauty products and inventory</p>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => handleOpenModal()}
-        >
-          <Plus size={16} />
-          Add Product
-        </button>
+        <div className="flex gap-2">
+          <button 
+            className="btn btn-secondary"
+            onClick={() => setShowScannerModal(true)}
+          >
+            <Scan size={16} />
+            Scan Barcode
+          </button>
+          <button 
+            className="btn btn-primary"
+            onClick={() => handleOpenModal()}
+          >
+            <Plus size={16} />
+            Add Product
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -402,6 +432,13 @@ const ProductsPage: React.FC = () => {
                             title="Adjust Stock"
                           >
                             <Package size={14} />
+                          </button>
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => handleOpenBarcodeModal(product)}
+                            title="Generate Barcode"
+                          >
+                            <Barcode size={14} />
                           </button>
                           <button
                             className="btn btn-sm btn-danger"
@@ -692,6 +729,86 @@ const ProductsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Modal */}
+      {showBarcodeModal && barcodeProduct && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Barcode - {barcodeProduct.name}</h3>
+              <button className="modal-close" onClick={() => setShowBarcodeModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <BarcodeGenerator
+                value={barcodeProduct.barcode || barcodeProduct.sku}
+                displayValue={true}
+                className="w-full"
+              />
+              
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold mb-2">Product Information</h4>
+                <div className="grid-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Product Name:</label>
+                    <p className="font-semibold">{barcodeProduct.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">SKU:</label>
+                    <p className="font-mono">{barcodeProduct.sku}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Barcode:</label>
+                    <p className="font-mono">{barcodeProduct.barcode || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Price:</label>
+                    <p className="font-semibold">₱{barcodeProduct.price.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowBarcodeModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Scanner Modal */}
+      {showScannerModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3 className="modal-title">Scan Barcode</h3>
+              <button className="modal-close" onClick={() => setShowScannerModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <BarcodeScanner
+                onScan={handleBarcodeScanned}
+                onError={(error) => toast.error(error)}
+                className="w-full"
+              />
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowScannerModal(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

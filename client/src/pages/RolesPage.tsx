@@ -4,24 +4,26 @@ import { Plus, Edit, Trash2, Search, Shield } from 'lucide-react'
 import { rolesAPI } from '../services/api'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import toast from 'react-hot-toast'
+import AddRoleModal from '../components/modals/role/AddRoleModal'
+import EditRoleModal from '../components/modals/role/EditRoleModal'
+import DeleteRoleModal from '../components/modals/role/DeleteRoleModal'
 
 interface Role {
   id: number
   name: string
   display_name: string
   description: string
+  users_count?: number
   created_at: string
 }
 
 const RolesPage: React.FC = () => {
-  const [showModal, setShowModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [deletingRole, setDeletingRole] = useState<Role | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [formData, setFormData] = useState({
-    name: '',
-    display_name: '',
-    description: ''
-  })
 
   const queryClient = useQueryClient()
 
@@ -32,95 +34,45 @@ const RolesPage: React.FC = () => {
     { keepPreviousData: true }
   )
 
-  // Create role mutation
-  const createRoleMutation = useMutation(rolesAPI.create, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('roles')
-      toast.success('Role created successfully!')
-      handleCloseModal()
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create role')
-    }
-  })
+  const roles: Role[] = rolesData?.data?.roles?.data || rolesData?.data?.roles || []
 
-  // Update role mutation
-  const updateRoleMutation = useMutation(
-    ({ id, data }: { id: number; data: any }) => rolesAPI.update(id, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('roles')
-        toast.success('Role updated successfully!')
-        handleCloseModal()
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to update role')
-      }
-    }
-  )
-
-  // Delete role mutation
-  const deleteRoleMutation = useMutation(rolesAPI.delete, {
-    onSuccess: () => {
-      queryClient.invalidateQueries('roles')
-      toast.success('Role deleted successfully!')
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete role')
-    }
-  })
-
-  const roles: Role[] = rolesData?.data?.roles || []
-
-  const handleOpenModal = (role?: Role) => {
-    if (role) {
-      setEditingRole(role)
-      setFormData({
-        name: role.name,
-        display_name: role.display_name,
-        description: role.description
-      })
-    } else {
-      setEditingRole(null)
-      setFormData({
-        name: '',
-        display_name: '',
-        description: ''
-      })
-    }
-    setShowModal(true)
+  const handleOpenEditModal = (role: Role) => {
+    setEditingRole(role)
+    setShowEditModal(true)
   }
 
-  const handleCloseModal = () => {
-    setShowModal(false)
+  const handleCloseEditModal = () => {
     setEditingRole(null)
+    setShowEditModal(false)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+  const handleOpenDeleteModal = (role: Role) => {
+    setDeletingRole(role)
+    setShowDeleteModal(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingRole) {
-      updateRoleMutation.mutate({ id: editingRole.id, data: formData })
-    } else {
-      createRoleMutation.mutate(formData)
-    }
+  const handleCloseDeleteModal = () => {
+    setDeletingRole(null)
+    setShowDeleteModal(false)
   }
 
-  const handleDelete = (role: Role) => {
-    if (window.confirm(`Are you sure you want to delete the role "${role.display_name}"?`)) {
-      deleteRoleMutation.mutate(role.id)
-    }
+  const handleRoleAdded = (message: string) => {
+    queryClient.invalidateQueries('roles')
+    toast.success(message)
+    setShowAddModal(false)
   }
 
-  const isLoading = createRoleMutation.isLoading || updateRoleMutation.isLoading
+  const handleRoleUpdated = (message: string) => {
+    queryClient.invalidateQueries('roles')
+    toast.success(message)
+    handleCloseEditModal()
+  }
+
+  const handleRoleDeleted = (message: string) => {
+    queryClient.invalidateQueries('roles')
+    toast.success(message)
+    handleCloseDeleteModal()
+  }
 
   return (
     <div className="roles-page fade-in">
@@ -132,7 +84,7 @@ const RolesPage: React.FC = () => {
         </div>
         <button 
           className="btn btn-primary"
-          onClick={() => handleOpenModal()}
+          onClick={() => setShowAddModal(true)}
         >
           <Plus size={16} />
           Add Role
@@ -190,6 +142,7 @@ const RolesPage: React.FC = () => {
                     <th>Role Name</th>
                     <th>Display Name</th>
                     <th>Description</th>
+                    <th>Users</th>
                     <th>Created</th>
                     <th>Actions</th>
                   </tr>
@@ -201,24 +154,28 @@ const RolesPage: React.FC = () => {
                         <div className="flex" style={{ alignItems: 'center', gap: '0.5rem' }}>
                           <Shield size={16} color="var(--primary-color)" />
                           <code>{role.name}</code>
+                          {['admin', 'manager', 'cashier'].includes(role.name) && (
+                            <span className="badge badge-secondary">System</span>
+                          )}
                         </div>
                       </td>
                       <td>
                         <strong>{role.display_name}</strong>
                       </td>
-                      <td>{role.description}</td>
+                      <td>{role.description || 'No description'}</td>
+                      <td>{role.users_count || 0}</td>
                       <td>{new Date(role.created_at).toLocaleDateString()}</td>
                       <td>
                         <div className="flex" style={{ gap: '0.5rem' }}>
                           <button
                             className="btn btn-sm btn-secondary"
-                            onClick={() => handleOpenModal(role)}
+                            onClick={() => handleOpenEditModal(role)}
                           >
                             <Edit size={14} />
                           </button>
                           <button
                             className="btn btn-sm btn-danger"
-                            onClick={() => handleDelete(role)}
+                            onClick={() => handleOpenDeleteModal(role)}
                             disabled={['admin', 'manager', 'cashier'].includes(role.name)}
                           >
                             <Trash2 size={14} />
@@ -234,89 +191,26 @@ const RolesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {editingRole ? 'Edit Role' : 'Add New Role'}
-              </h3>
-              <button className="modal-close" onClick={handleCloseModal}>
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">Role Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="form-input"
-                    placeholder="e.g., supervisor"
-                    required
-                  />
-                  <small className="text-muted">
-                    Use lowercase letters and underscores only
-                  </small>
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Display Name *</label>
-                  <input
-                    type="text"
-                    name="display_name"
-                    value={formData.display_name}
-                    onChange={handleInputChange}
-                    className="form-input"
-                    placeholder="e.g., Supervisor"
-                    required
-                  />
-                </div>
+      {/* Modals */}
+      <AddRoleModal
+        showModal={showAddModal}
+        onRoleAdded={handleRoleAdded}
+        onClose={() => setShowAddModal(false)}
+      />
 
-                <div className="form-group">
-                  <label className="form-label">Description</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    className="form-textarea"
-                    rows={3}
-                    placeholder="Describe the role's responsibilities and permissions"
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleCloseModal}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      {editingRole ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    editingRole ? 'Update Role' : 'Create Role'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <EditRoleModal
+        showModal={showEditModal}
+        role={editingRole}
+        onRoleUpdated={handleRoleUpdated}
+        onClose={handleCloseEditModal}
+      />
+
+      <DeleteRoleModal
+        showModal={showDeleteModal}
+        role={deletingRole}
+        onRoleDeleted={handleRoleDeleted}
+        onClose={handleCloseDeleteModal}
+      />
     </div>
   )
 }

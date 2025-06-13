@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { Plus, Search, Eye, ShoppingCart, Calendar, User, CreditCard, Printer } from 'lucide-react'
+import { Plus, Search, Eye, ShoppingCart, Calendar, User, CreditCard, Printer, Receipt } from 'lucide-react'
 import { transactionsAPI, productsAPI } from '../services/api'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
+import ReceiptPrinter from '../components/reports/ReceiptPrinter'
 import toast from 'react-hot-toast'
 
 interface Transaction {
@@ -190,95 +191,9 @@ const TransactionsPage: React.FC = () => {
     createTransactionMutation.mutate(transactionData)
   }
 
-  const printReceipt = () => {
-    if (!selectedTransaction) return
-
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-
-    const receiptHTML = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Receipt - ${selectedTransaction.transaction_number}</title>
-          <style>
-            body { font-family: 'Courier New', monospace; font-size: 12px; margin: 0; padding: 20px; }
-            .receipt { max-width: 300px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .line { border-bottom: 1px dashed #000; margin: 10px 0; }
-            .item { display: flex; justify-content: space-between; margin: 5px 0; }
-            .total { font-weight: bold; font-size: 14px; }
-            .barcode { text-align: center; font-family: 'Libre Barcode 128', monospace; font-size: 24px; margin: 20px 0; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="header">
-              <h2>ChicCheckout</h2>
-              <p>Beauty POS System</p>
-              <p>Receipt #${selectedTransaction.transaction_number}</p>
-              <p>${new Date(selectedTransaction.created_at).toLocaleString()}</p>
-            </div>
-            
-            <div class="line"></div>
-            
-            ${selectedTransaction.customer_name ? `<p>Customer: ${selectedTransaction.customer_name}</p>` : ''}
-            <p>Cashier: ${selectedTransaction.user.first_name} ${selectedTransaction.user.last_name}</p>
-            
-            <div class="line"></div>
-            
-            ${selectedTransaction.items.map(item => `
-              <div class="item">
-                <span>${item.product.name} x${item.quantity}</span>
-                <span>₱${item.total_price.toFixed(2)}</span>
-              </div>
-            `).join('')}
-            
-            <div class="line"></div>
-            
-            <div class="item">
-              <span>Subtotal:</span>
-              <span>₱${selectedTransaction.subtotal.toFixed(2)}</span>
-            </div>
-            ${selectedTransaction.discount_amount > 0 ? `
-              <div class="item">
-                <span>Discount:</span>
-                <span>-₱${selectedTransaction.discount_amount.toFixed(2)}</span>
-              </div>
-            ` : ''}
-            <div class="item">
-              <span>Tax:</span>
-              <span>₱${selectedTransaction.tax_amount.toFixed(2)}</span>
-            </div>
-            <div class="item total">
-              <span>Total:</span>
-              <span>₱${selectedTransaction.total_amount.toFixed(2)}</span>
-            </div>
-            <div class="item">
-              <span>Paid:</span>
-              <span>₱${selectedTransaction.amount_paid.toFixed(2)}</span>
-            </div>
-            <div class="item">
-              <span>Change:</span>
-              <span>₱${selectedTransaction.change_amount.toFixed(2)}</span>
-            </div>
-            
-            <div class="line"></div>
-            
-            <div class="barcode">*${selectedTransaction.transaction_number}*</div>
-            
-            <div style="text-align: center; margin-top: 20px;">
-              <p>Thank you for shopping with us!</p>
-              <p>Visit us again soon!</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
-
-    printWindow.document.write(receiptHTML)
-    printWindow.document.close()
-    printWindow.print()
+  const handleViewReceipt = (transaction: Transaction) => {
+    setSelectedTransaction(transaction)
+    setShowReceiptModal(true)
   }
 
   return (
@@ -413,21 +328,17 @@ const TransactionsPage: React.FC = () => {
                         <div className="flex" style={{ gap: '0.5rem' }}>
                           <button
                             className="btn btn-sm btn-secondary"
-                            onClick={() => {
-                              setSelectedTransaction(transaction)
-                              setShowReceiptModal(true)
-                            }}
+                            onClick={() => handleViewReceipt(transaction)}
+                            title="View Receipt"
                           >
                             <Eye size={14} />
                           </button>
                           <button
                             className="btn btn-sm btn-primary"
-                            onClick={() => {
-                              setSelectedTransaction(transaction)
-                              printReceipt()
-                            }}
+                            onClick={() => handleViewReceipt(transaction)}
+                            title="Print Receipt"
                           >
-                            <Printer size={14} />
+                            <Receipt size={14} />
                           </button>
                         </div>
                       </td>
@@ -589,7 +500,7 @@ const TransactionsPage: React.FC = () => {
       {/* Receipt Modal */}
       {showReceiptModal && selectedTransaction && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
               <h3 className="modal-title">Receipt - {selectedTransaction.transaction_number}</h3>
               <button className="modal-close" onClick={() => setShowReceiptModal(false)}>
@@ -597,70 +508,7 @@ const TransactionsPage: React.FC = () => {
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ fontFamily: 'monospace', fontSize: '14px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <h3>ChicCheckout</h3>
-                  <p>Beauty POS System</p>
-                  <p>Receipt #{selectedTransaction.transaction_number}</p>
-                  <p>{new Date(selectedTransaction.created_at).toLocaleString()}</p>
-                </div>
-                
-                <hr />
-                
-                {selectedTransaction.customer_name && (
-                  <p>Customer: {selectedTransaction.customer_name}</p>
-                )}
-                <p>Cashier: {selectedTransaction.user.first_name} {selectedTransaction.user.last_name}</p>
-                
-                <hr />
-                
-                {selectedTransaction.items.map((item) => (
-                  <div key={item.id} className="flex-between">
-                    <span>{item.product.name} x{item.quantity}</span>
-                    <span>₱{item.total_price.toFixed(2)}</span>
-                  </div>
-                ))}
-                
-                <hr />
-                
-                <div className="flex-between">
-                  <span>Subtotal:</span>
-                  <span>₱{selectedTransaction.subtotal.toFixed(2)}</span>
-                </div>
-                {selectedTransaction.discount_amount > 0 && (
-                  <div className="flex-between">
-                    <span>Discount:</span>
-                    <span>-₱{selectedTransaction.discount_amount.toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex-between">
-                  <span>Tax:</span>
-                  <span>₱{selectedTransaction.tax_amount.toFixed(2)}</span>
-                </div>
-                <div className="flex-between" style={{ fontWeight: 'bold' }}>
-                  <span>Total:</span>
-                  <span>₱{selectedTransaction.total_amount.toFixed(2)}</span>
-                </div>
-                <div className="flex-between">
-                  <span>Paid:</span>
-                  <span>₱{selectedTransaction.amount_paid.toFixed(2)}</span>
-                </div>
-                <div className="flex-between">
-                  <span>Change:</span>
-                  <span>₱{selectedTransaction.change_amount.toFixed(2)}</span>
-                </div>
-                
-                <hr />
-                
-                <div style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: '18px' }}>
-                  *{selectedTransaction.transaction_number}*
-                </div>
-                
-                <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                  <p>Thank you for shopping with us!</p>
-                  <p>Visit us again soon!</p>
-                </div>
-              </div>
+              <ReceiptPrinter transaction={selectedTransaction} />
             </div>
             <div className="modal-footer">
               <button
@@ -668,13 +516,6 @@ const TransactionsPage: React.FC = () => {
                 onClick={() => setShowReceiptModal(false)}
               >
                 Close
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={printReceipt}
-              >
-                <Printer size={16} />
-                Print Receipt
               </button>
             </div>
           </div>
